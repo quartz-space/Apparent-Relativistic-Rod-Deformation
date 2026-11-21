@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apparent Relativistic Rod Deformation</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --surface: #fdfcfc;
+    --surface-dim: #f2f0f0;
+    --surface-bright: #ffffff;
+    --surface-translucent: rgba(255, 255, 255, 0.88);
+    --on-surface: #1a1a1a;
+    --on-surface-variant: #5f6368;
+    --stroke: #e3e3e3;
+    --accent: #2575fc;
+    --chart-true: #2575fc;
+    --chart-seen: #c84288;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --font-sans: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #0f0f0f;
+      --surface-dim: #141414;
+      --surface-bright: #1c1c1c;
+      --surface-translucent: rgba(24, 24, 27, 0.88);
+      --on-surface: #e0e0e0;
+      --on-surface-variant: #a0a4ad;
+      --stroke: #2d2f38;
+      --chart-true: #6aa2ff;
+      --chart-seen: #ff6fb6;
+      --accent: #6aa2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #0f0f0f;
+    --surface-dim: #141414;
+    --surface-bright: #1c1c1c;
+    --surface-translucent: rgba(24, 24, 27, 0.88);
+    --on-surface: #e0e0e0;
+    --on-surface-variant: #a0a4ad;
+    --stroke: #2d2f38;
+    --chart-true: #6aa2ff;
+    --chart-seen: #ff6fb6;
+    --accent: #6aa2ff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--on-surface);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .widget {
+    width: 100%;
+    max-width: 708px;
+    margin: 0 auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  p  { margin: 0; }
+
+  .header-deck {
+    background: var(--surface-dim);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .subtitle { color: var(--on-surface-variant); }
+
+  .legend { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .dot.true { background: var(--chart-true); }
+  .dot.seen { background: var(--chart-seen); box-shadow: 0 0 6px var(--chart-seen); }
+
+  .canvas-viewport {
+    position: relative;
+    width: 100%;
+    height: 360px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--stroke);
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; outline-offset: -3px; }
+
+  .overlay-metrics {
+    position: absolute;
+    top: 12px; left: 12px; right: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .badge {
+    background: var(--surface-translucent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .readout {
+    background: var(--surface-dim);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    font-size: 13px;
+  }
+  .readout-item { display: flex; flex-direction: column; gap: 2px; }
+  .readout-label { color: var(--on-surface-variant); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .readout-value { font-family: var(--font-mono); font-weight: 600; }
+
+  .controls {
+    background: var(--surface-bright);
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .control-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 56px;
+    align-items: center;
+    gap: 12px;
+  }
+  .control-row output {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: right;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+  .action-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 4px; flex-wrap: wrap; }
+  .buttons { display: flex; gap: 8px; }
+  .caption { color: var(--on-surface-variant); font-size: 12px; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    color: var(--on-surface);
+    background: var(--surface-dim);
+    border: 1px solid var(--stroke);
+    border-radius: 999px;
+    padding: 6px 16px;
+    cursor: pointer;
+    min-width: 108px;
+  }
+  button:hover { background: var(--stroke); }
+  button[aria-pressed="true"]#btn-photons { border-color: var(--chart-seen); }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); }
+
+  @media (max-width: 480px) {
+    .control-row { grid-template-columns: 1fr 56px; }
+    .control-row label { grid-column: 1 / -1; }
+    .canvas-viewport { height: 300px; }
+  }
+</style>
+</head>
+<body>
+<div class="widget">
+
+  <div class="header-deck">
+    <div class="header-top">
+      <h1>Relativistic Rod Deformation</h1>
+      <div class="legend">
+        <div class="legend-item"><span class="dot true"></span><span>True</span></div>
+        <div class="legend-item"><span class="dot seen"></span><span>Apparent</span></div>
+      </div>
+    </div>
+    <p class="subtitle">Compare a swung rod's instantaneous physical curve with its time-delayed image seen by an observer.</p>
+  </div>
+
+  <div class="canvas-viewport">
+    <canvas id="viz" tabindex="0"
+            aria-label="Interactive simulation of the true versus apparent shape of a swinging rod. Move the pointer over the rod, or use the up and down arrow keys, to inspect a segment."></canvas>
+    <div class="overlay-metrics">
+      <div class="badge"><span class="dot true"></span><span>Physical state (t)</span></div>
+      <div class="badge"><span class="dot seen"></span><span>Retarded light state</span></div>
+    </div>
+  </div>
+
+  <div class="readout" aria-live="off">
+    <div class="readout-item"><span class="readout-label">Rod segment (s)</span><span class="readout-value" id="val-segment">50% L</span></div>
+    <div class="readout-item"><span class="readout-label">Signal delay (Δt)</span><span class="readout-value" id="val-delay">0.00 s</span></div>
+    <div class="readout-item"><span class="readout-label">Spatial lag (Δr)</span><span class="readout-value" id="val-lag">0.0 units</span></div>
+    <div class="readout-item"><span class="readout-label">Apparent angle</span><span class="readout-value" id="val-angle">0.0°</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="control-row">
+      <label for="slider-vwave">Wave speed (v)</label>
+      <input type="range" id="slider-vwave" min="0.10" max="0.80" step="0.01" value="0.25">
+      <output for="slider-vwave" id="val-vwave">0.25</output>
+    </div>
+    <div class="control-row">
+      <label for="slider-freq">Swing rate (f)</label>
+      <input type="range" id="slider-freq" min="0.10" max="1.50" step="0.05" value="0.60">
+      <output for="slider-freq" id="val-freq">0.60 Hz</output>
+    </div>
+    <div class="control-row">
+      <label for="slider-obs">Observer distance (y)</label>
+      <input type="range" id="slider-obs" min="-60" max="-10" step="1" value="-25">
+      <output for="slider-obs" id="val-obs">-25</output>
+    </div>
+    <div class="action-bar">
+      <div class="buttons">
+        <button type="button" id="btn-playpause" aria-pressed="true">Pause</button>
+        <button type="button" id="btn-photons" aria-pressed="true">Photons: On</button>
+      </div>
+      <span class="caption">c = 1.0 (lightspeed)</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------- model
+  const C_LIGHT = 1.0;          // speed of light (normalised)
+  const ROD_LENGTH = 50;        // model units
+  const NUM_SAMPLES = 120;
+  const NUM_PHOTONS = 14;
+  const AMPLITUDE = 0.45;       // rad
+  const WAVE_SPEED_SCALE = 100;
+  const MAX_LOOKBACK = 8.0;     // s searched by the bisection
+  const BISECTION_ITERS = 16;
+  const PHOTON_RATE = 0.8;      // photon-stream cycles per second
+
+  const LIMITS = {
+    vWave: [0.10, 0.80],
+    freq:  [0.10, 1.50],
+    obsY:  [-60, -10]
+  };
+  const STORAGE_KEY = 'relativistic-rod:state';
+
+  const state = {
+    vWave: 0.25,
+    freq: 0.60,
+    obsY: -25,
+    isPlaying: true,
+    showPhotons: true,
+    hoverS: ROD_LENGTH / 2       // FIX: was 0.5 (≈1 % of the rod); start mid-rod
+  };
+
+  const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
+
+  // Physical position of rod point s at time t (rod pivots at the origin).
+  function getPhysicalPos(s, t, freq, vWave) {
+    const phase = 2 * Math.PI * freq * (t - s / (vWave * WAVE_SPEED_SCALE));
+    const angle = AMPLITUDE * Math.sin(phase) * (s / ROD_LENGTH);
+    return { x: s * Math.sin(angle), y: s * Math.cos(angle), angle };
+  }
+
+  // Emission time tE with tE + |x(tE) - observer| / c == t, found by bisection.
+  function getRetardedPos(s, t, obs, freq, vWave) {
+    let lo = t - MAX_LOOKBACK, hi = t, tE = t;
+    for (let i = 0; i < BISECTION_ITERS; i++) {
+      tE = (lo + hi) / 2;
+      const p = getPhysicalPos(s, tE, freq, vWave);
+      const arrival = tE + Math.hypot(p.x - obs.x, p.y - obs.y) / C_LIGHT;
+      if (arrival < t) lo = tE; else hi = tE;
+    }
+    const p = getPhysicalPos(s, tE, freq, vWave);
+    return { x: p.x, y: p.y, angle: p.angle, tEmit: tE, delay: t - tE };
+  }
+
+  // ---------------------------------------------------------------- DOM
+  const $ = id => document.getElementById(id);
+  const canvas = $('viz');
+  const ctx = canvas.getContext('2d');
+  const el = {
+    vwave: $('slider-vwave'), freq: $('slider-freq'), obs: $('slider-obs'),
+    vwaveVal: $('val-vwave'), freqVal: $('val-freq'), obsVal: $('val-obs'),
+    play: $('btn-playpause'), photons: $('btn-photons'),
+    segment: $('val-segment'), delay: $('val-delay'), lag: $('val-lag'), angle: $('val-angle')
+  };
+
+  // ---------------------------------------------------------------- persistence
+  // FIX: replaces the host-only `pageVault` dependency with plain localStorage.
+  function loadState() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (!raw || typeof raw !== 'object') return;
+      if (Number.isFinite(+raw.vWave)) state.vWave = clamp(+raw.vWave, LIMITS.vWave);
+      if (Number.isFinite(+raw.freq))  state.freq  = clamp(+raw.freq,  LIMITS.freq);
+      if (Number.isFinite(+raw.obsY))  state.obsY  = clamp(+raw.obsY,  LIMITS.obsY);
+      if (typeof raw.isPlaying === 'boolean')   state.isPlaying = raw.isPlaying;
+      if (typeof raw.showPhotons === 'boolean') state.showPhotons = raw.showPhotons;
+    } catch (_) { /* storage unavailable or corrupt: keep defaults */ }
+  }
+  function saveState() {
+    try {
+      const { vWave, freq, obsY, isPlaying, showPhotons } = state;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ vWave, freq, obsY, isPlaying, showPhotons }));
+    } catch (_) { /* ignore */ }
+  }
+
+  function syncControls() {
+    el.vwave.value = state.vWave;
+    el.freq.value = state.freq;
+    el.obs.value = state.obsY;
+    el.vwaveVal.textContent = state.vWave.toFixed(2);
+    el.freqVal.textContent = state.freq.toFixed(2) + ' Hz';
+    el.obsVal.textContent = String(state.obsY);
+    el.play.textContent = state.isPlaying ? 'Pause' : 'Play';
+    el.play.setAttribute('aria-pressed', String(state.isPlaying));
+    el.photons.textContent = state.showPhotons ? 'Photons: On' : 'Photons: Off';
+    el.photons.setAttribute('aria-pressed', String(state.showPhotons));
+  }
+
+  // ---------------------------------------------------------------- theme colours
+  // FIX: read CSS variables once per theme change, not several times per frame.
+  let colors = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const v = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
+    colors = {
+      true: v('--chart-true', '#2575fc'),
+      seen: v('--chart-seen', '#c84288'),
+      onSurface: v('--on-surface', '#000'),
+      variant: v('--on-surface-variant', '#666'),
+      grid: v('--stroke', 'rgba(0,0,0,.1)')
+    };
+  }
+  readColors();
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  if (mq && mq.addEventListener) mq.addEventListener('change', readColors);
+  // Optional host integration: parent pages can post { type: 'set-theme', theme: 'dark' | 'light' }.
+  window.addEventListener('message', e => {
+    const d = e.data;
+    if (d && (d.type === 'set-theme' || d.type === 'APPLY_THEME') && (d.theme === 'dark' || d.theme === 'light')) {
+      document.documentElement.setAttribute('data-theme', d.theme);
+      readColors();
+    }
+  });
+
+  // ---------------------------------------------------------------- drawing
+  let simTime = 0;
+  let lastNow = performance.now();
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 600, h = canvas.clientHeight || 360;
+    const pw = Math.floor(w * dpr), ph = Math.floor(h * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w, h };
+  }
+
+  function draw() {
+    const { w, h } = resizeCanvas();
+    ctx.clearRect(0, 0, w, h);
+
+    const cx = w / 2, cy = h * 0.65, scale = Math.min(w, h) / 100;
+    const toScreen = (x, y) => ({ px: cx + x * scale, py: cy - y * scale });
+
+    const obs = { x: 0, y: state.obsY };
+    const obsS = toScreen(obs.x, obs.y);
+
+    // Distance rings around the observer
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = colors.grid;
+    ctx.setLineDash([4, 4]);
+    for (let r = 20; r <= 100; r += 20) {
+      ctx.beginPath();
+      ctx.arc(obsS.px, obsS.py, r * scale, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Curves
+    const trueCurve = [], seenCurve = [];
+    for (let i = 0; i <= NUM_SAMPLES; i++) {
+      const s = (i / NUM_SAMPLES) * ROD_LENGTH;
+      trueCurve.push({ s, ...getPhysicalPos(s, simTime, state.freq, state.vWave) });
+      seenCurve.push({ s, ...getRetardedPos(s, simTime, obs, state.freq, state.vWave) });
+    }
+
+    const strokeCurve = (curve, color, width, glow) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = width;
+      ctx.strokeStyle = color;
+      if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
+      curve.forEach((p, i) => {
+        const q = toScreen(p.x, p.y);
+        if (i === 0) ctx.moveTo(q.px, q.py); else ctx.lineTo(q.px, q.py);
+      });
+      ctx.stroke();
+      ctx.restore();
+    };
+    strokeCurve(trueCurve, colors.true, 3, false);
+    strokeCurve(seenCurve, colors.seen, 3.5, true);
+
+    // Photons streaming from the retarded rod position towards the observer.
+    // FIX: the original computed ((t - tEmit) / delay) % 1, which is always exactly 0
+    // (delay is defined as t - tEmit), so the photons never moved. They now cycle along the ray.
+    if (state.showPhotons) {
+      ctx.fillStyle = colors.seen;
+      for (let k = 0; k < NUM_PHOTONS; k++) {
+        const s = (k / (NUM_PHOTONS - 1)) * ROD_LENGTH;
+        const ret = getRetardedPos(s, simTime, obs, state.freq, state.vWave);
+        const phase = (simTime * PHOTON_RATE + k / NUM_PHOTONS) % 1;
+        const q = toScreen(ret.x + (obs.x - ret.x) * phase, ret.y + (obs.y - ret.y) * phase);
+        ctx.beginPath();
+        ctx.arc(q.px, q.py, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+
+    // Pivot and observer
+    const base = toScreen(0, 0);
+    ctx.fillStyle = colors.onSurface;
+    ctx.beginPath(); ctx.arc(base.px, base.py, 5, 0, 2 * Math.PI); ctx.fill();
+
+    ctx.beginPath(); ctx.arc(obsS.px, obsS.py, 7, 0, 2 * Math.PI); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = colors.seen; ctx.stroke();
+
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = colors.variant;
+    ctx.textAlign = 'center';
+    ctx.fillText('Observer', obsS.px, obsS.py + 18);
+
+    // Inspected segment
+    const idx = Math.min(NUM_SAMPLES, Math.max(0, Math.round((state.hoverS / ROD_LENGTH) * NUM_SAMPLES)));
+    const t = trueCurve[idx], r = seenCurve[idx];
+    const pt = toScreen(t.x, t.y), pr = toScreen(r.x, r.y);
+
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = colors.variant;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pt.px, pt.py); ctx.lineTo(pr.px, pr.py); ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = colors.seen;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pr.px, pr.py); ctx.lineTo(obsS.px, obsS.py); ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = colors.true;  ctx.beginPath(); ctx.arc(pt.px, pt.py, 5, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = colors.seen;  ctx.beginPath(); ctx.arc(pr.px, pr.py, 5, 0, 2 * Math.PI); ctx.fill();
+
+    el.segment.textContent = ((t.s / ROD_LENGTH) * 100).toFixed(0) + '% L';
+    el.delay.textContent = r.delay.toFixed(2) + ' s';
+    el.lag.textContent = Math.hypot(t.x - r.x, t.y - r.y).toFixed(1) + ' units';
+    el.angle.textContent = ((r.angle * 180) / Math.PI).toFixed(1) + '°';
+  }
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastNow) / 1000);
+    lastNow = now;
+    if (state.isPlaying) simTime += dt;
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- events
+  el.vwave.addEventListener('input', e => { state.vWave = parseFloat(e.target.value); syncControls(); saveState(); });
+  el.freq.addEventListener('input',  e => { state.freq  = parseFloat(e.target.value); syncControls(); saveState(); });
+  el.obs.addEventListener('input',   e => { state.obsY  = parseFloat(e.target.value); syncControls(); saveState(); });
+  el.play.addEventListener('click',  () => { state.isPlaying = !state.isPlaying; syncControls(); saveState(); });
+  el.photons.addEventListener('click', () => { state.showPhotons = !state.showPhotons; syncControls(); saveState(); });
+
+  // Pointer: vertical position maps to the rod parameter s.
+  function onPointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = Math.min(rect.width, rect.height) / 100;
+    if (scale <= 0) return;
+    const yVal = (rect.height * 0.65 - (e.clientY - rect.top)) / scale;
+    state.hoverS = Math.max(2, Math.min(ROD_LENGTH, yVal));
+  }
+  canvas.addEventListener('pointermove', onPointer);
+  canvas.addEventListener('pointerdown', onPointer);
+
+  // Keyboard access (the original canvas was focusable but did nothing on key presses).
+  canvas.addEventListener('keydown', e => {
+    const step = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
+    if (!step) return;
+    state.hoverS = Math.max(2, Math.min(ROD_LENGTH, state.hoverS + step));
+    e.preventDefault();
+  });
+
+  // Don't burn CPU in a background tab, and don't let simTime jump when it returns.
+  document.addEventListener('visibilitychange', () => { lastNow = performance.now(); });
+
+  // ---------------------------------------------------------------- start
+  loadState();
+  syncControls();
+  requestAnimationFrame(now => { lastNow = now; frame(now); });
+})();
+</script>
+</body>
+</html>
